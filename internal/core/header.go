@@ -30,7 +30,7 @@ type BMPImage struct {
 	Data      []byte     // Raw image data (pixel array).
 }
 
-// ParseHeader parses the BMP and DIB headers from a byte slice.
+// ParseBMP parses the BMP and DIB headers from a byte slice.
 // The function checks if the file is a valid 24-bit uncompressed BMP and handles various errors.
 //
 // The function:
@@ -42,7 +42,7 @@ type BMPImage struct {
 // Returns:
 // - BMPImage struct containing the parsed headers and image data.
 // - Error if the BMP is invalid or corrupted.
-func ParseHeader(b []byte) (*BMPImage, error) {
+func ParseBMP(b []byte) (*BMPImage, error) {
 	// The BMP file must be at least 54 bytes (BMP and DIB headers combined).
 	if len(b) < 54 {
 		return nil, ErrInvalidBMP
@@ -50,43 +50,52 @@ func ParseHeader(b []byte) (*BMPImage, error) {
 
 	// Parse the BMP header.
 	header := &BMPHeader{}
-	header.FileType = string(b[:2]) // The first two bytes should be "BM".
+	header.FileType = string(b[:2])
 	if header.FileType != "BM" {
 		return nil, ErrInvalidFileType
 	}
-	header.FileSizeInBytes = binary.LittleEndian.Uint32(b[2:6]) // Extract file size from the header.
+	header.FileSizeInBytes = binary.LittleEndian.Uint32(b[2:6])
+	// Check the file size extracted from the header against the actual file size.
 	if int(header.FileSizeInBytes) != len(b) {
+		// Debug: Print the expected and actual file sizes
+		fmt.Printf("Expected File Size: %d, Actual File Size: %d\n",
+			header.FileSizeInBytes, uint32(len(b)))
+		fmt.Printf("Header Bytes: %v\n", b[:54])
+		fmt.Printf("Data Length: %d\n", len(b[54:]))
 		return nil, ErrCorruptFile
 	}
-	header.HeaderSize = binary.LittleEndian.Uint16(b[10:14]) // Extract header size.
+
+	header.HeaderSize = binary.LittleEndian.Uint16(b[10:14])
 
 	// Parse the DIB header.
 	dibheader := &DIBHeader{}
-	dibheader.DibHeaderSize = binary.LittleEndian.Uint32(b[14:18]) // Extract DIB header size.
-	if dibheader.DibHeaderSize < 40 {                              // Check if DIB header size is valid.
+	dibheader.DibHeaderSize = binary.LittleEndian.Uint32(b[14:18])
+	if dibheader.DibHeaderSize < 40 {
 		return nil, ErrInvalidHeaderSize
 	}
-	dibheader.WidthInPixels = int32(binary.LittleEndian.Uint32(b[18:22]))  // Extract image width.
-	dibheader.HeightInPixels = int32(binary.LittleEndian.Uint32(b[22:26])) // Extract image height.
+	dibheader.WidthInPixels = int32(binary.LittleEndian.Uint32(b[18:22]))
+	dibheader.HeightInPixels = int32(binary.LittleEndian.Uint32(b[22:26]))
 
 	// Ensure that both width and height are positive. Height can be negative (stored upside-down).
 	if dibheader.WidthInPixels <= 0 || dibheader.HeightInPixels == 0 {
 		return nil, ErrNonPositiveDimensions
 	}
 
-	dibheader.PixelSizeInBits = binary.LittleEndian.Uint16(b[28:30]) // Extract bits per pixel.
-	if dibheader.PixelSizeInBits != 24 {                             // Only 24-bit BMPs are supported.
+	dibheader.PixelSizeInBits = binary.LittleEndian.Uint16(b[28:30])
+	if dibheader.PixelSizeInBits != 24 { // Only 24-bit BMPs are supported.
 		return nil, ErrUnsupportedFormat
 	}
 
-	dibheader.ImageSizeInBytes = binary.LittleEndian.Uint32(b[34:38]) // Extract image data size.
+	dibheader.ImageSizeInBytes = binary.LittleEndian.Uint32(b[34:38])
 
-	// Calculate the expected image size in bytes based on dimensions and pixel size.
-	bytesPerPixel := int(dibheader.PixelSizeInBits / 8)
-	rowSize := ((int(dibheader.WidthInPixels)*bytesPerPixel + 3) / 4) * 4 // BMP rows are padded to a multiple of 4 bytes.
-	expectedImageSize := rowSize * int(abs32(dibheader.HeightInPixels))   // Adjust for negative height if upside-down.
+	// Calculate expected image size
+	expectedImageSize := int(dibheader.WidthInPixels)*int(abs32(dibheader.HeightInPixels))*int(dibheader.PixelSizeInBits)/8 + 2
 
-	// Ensure the actual image size matches the expected size.
+	// Debug log to check calculated sizes
+	// fmt.Printf("Width: %d, Height: %d, Expected Image Size: %d, Actual Image Size: %d\n",
+	// 	dibheader.WidthInPixels, dibheader.HeightInPixels, expectedImageSize, dibheader.ImageSizeInBytes)
+
+	// Ensure the actual image size matches the expected size
 	if expectedImageSize != int(dibheader.ImageSizeInBytes) {
 		return nil, ErrInvalidImageData
 	}

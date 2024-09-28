@@ -3,6 +3,7 @@ package bitmap
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/ab-dauletkhan/bitmap/internal/core"
 )
@@ -31,13 +32,20 @@ func Run() {
 			os.Exit(1)
 		}
 
+		if strings.HasPrefix(args[1], "-") {
+			if args[1] != "--help" && args[1] != "-h" {
+				fmt.Println(core.ErrIncorrectArgument)
+			}
+			core.PrintUsage("header")
+			return
+		}
 		bytes, err := os.ReadFile(args[1])
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
 
-		image, err := core.ParseHeader(bytes)
+		image, err := core.ParseBMP(bytes)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -54,5 +62,4 @@ func Run() {
 		core.PrintUsage()
 		os.Exit(1)
 	}
-
 }
