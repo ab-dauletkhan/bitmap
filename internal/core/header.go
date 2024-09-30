@@ -3,142 +3,174 @@ package core
 import (
 	"encoding/binary"
 	"fmt"
+	"math"
 )
 
 // BMPHeader defines the structure for the BMP file header.
-// It contains basic information like file type, file size in bytes, and header size.
+// It contains basic information about the file type, size, and data offset.
 type BMPHeader struct {
-	FileType        string // Should always be "BM" for valid BMP files.
-	FileSizeInBytes uint32 // Total size of the BMP file in bytes.
-	HeaderSize      uint16 // Size of the BMP header, typically 54 bytes.
+	Signature  [2]byte // Should always be "BM" for valid BMP files.
+	FileSize   uint32  // Total size of the BMP file in bytes.
+	Reserved   uint32  // Reserved, must be 0
+	DataOffset uint32  // Offset to the start of pixel data
 }
 
 // DIBHeader defines the structure for the DIB (Device Independent Bitmap) header.
-// It stores detailed information about the image, such as dimensions and pixel format.
+// It stores detailed information about the image, such as dimensions and color format.
 type DIBHeader struct {
-	DibHeaderSize    uint32 // Size of the DIB header.
-	WidthInPixels    int32  // Width of the image in pixels.
-	HeightInPixels   int32  // Height of the image in pixels. Can be negative if stored upside-down.
-	PixelSizeInBits  uint16 // Number of bits per pixel. Usually 24 for BMP.
-	ImageSizeInBytes uint32 // Size of the raw bitmap data in bytes.
+	Size            uint32 // Size of the DIB header
+	Width           int32  // Width of the image in pixels
+	Height          int32  // Height of the image in pixels
+	Planes          uint16 // Number of color planes (must be 1)
+	BitsPerPixel    uint16 // Bits per pixel
+	Compression     uint32 // Compression method used
+	ImageSize       uint32 // Size of the raw bitmap data
+	XPixelsPerMeter int32  // Horizontal resolution of the image
+	YPixelsPerMeter int32  // Vertical resolution of the image
+	ColorsUsed      uint32 // Number of colors in the color palette
+	ColorsImportant uint32 // Number of important colors used
 }
 
 // BMPImage encapsulates both the BMP and DIB headers, along with the actual image data.
 type BMPImage struct {
-	bmpHeader *BMPHeader // BMP file header.
-	dibHeader *DIBHeader // DIB header containing image information.
-	Data      []byte     // Raw image data (pixel array).
+	Header     BMPHeader
+	InfoHeader DIBHeader
+	Data       []byte
 }
 
-// ParseBMP parses the BMP and DIB headers from a byte slice.
-// The function checks if the file is a valid 24-bit uncompressed BMP and handles various errors.
+// ParseBMP parses a BMP file from a byte slice and returns a BMPImage struct.
+// It performs various checks to ensure the validity and supported format of the BMP file.
 //
 // The function:
 // - Verifies the file size and header integrity.
 // - Ensures the file type is "BM".
-// - Extracts the header fields and validates the dimensions and pixel size.
-// - Checks the raw image data size matches the expected size.
+// - Parses both BMP and DIB headers.
+// - Validates header information including dimensions, bit depth, and compression.
+// - Checks the raw image data size against the calculated expected size.
 //
 // Returns:
-// - BMPImage struct containing the parsed headers and image data.
-// - Error if the BMP is invalid or corrupted.
+// - *BMPImage: A pointer to the parsed BMPImage struct.
+// - error: An error if the BMP is invalid, unsupported, or corrupted.
 func ParseBMP(b []byte) (*BMPImage, error) {
-	// The BMP file must be at least 54 bytes (BMP and DIB headers combined).
 	if len(b) < 54 {
 		return nil, ErrInvalidBMP
 	}
 
-	// Parse the BMP header.
-	header := &BMPHeader{}
-	header.FileType = string(b[:2])
-	if header.FileType != "BM" {
+	bmp := &BMPImage{}
+
+	// Parse BMP Header
+	bmp.Header.Signature = [2]byte{b[0], b[1]}
+	if string(bmp.Header.Signature[:]) != "BM" {
 		return nil, ErrInvalidFileType
 	}
-	header.FileSizeInBytes = binary.LittleEndian.Uint32(b[2:6])
-	// Check the file size extracted from the header against the actual file size.
-	if int(header.FileSizeInBytes) != len(b) {
-		// Debug: Print the expected and actual file sizes
-		fmt.Printf("Expected File Size: %d, Actual File Size: %d\n",
-			header.FileSizeInBytes, uint32(len(b)))
-		fmt.Printf("Header Bytes: %v\n", b[:54])
-		fmt.Printf("Data Length: %d\n", len(b[54:]))
-		return nil, ErrCorruptFile
-	}
+	bmp.Header.FileSize = binary.LittleEndian.Uint32(b[2:6])
+	bmp.Header.Reserved = binary.LittleEndian.Uint32(b[6:10])
+	bmp.Header.DataOffset = binary.LittleEndian.Uint32(b[10:14])
 
-	header.HeaderSize = binary.LittleEndian.Uint16(b[10:14])
-
-	// Parse the DIB header.
-	dibheader := &DIBHeader{}
-	dibheader.DibHeaderSize = binary.LittleEndian.Uint32(b[14:18])
-	if dibheader.DibHeaderSize < 40 {
+	// Parse DIB Header
+	bmp.InfoHeader.Size = binary.LittleEndian.Uint32(b[14:18])
+	if bmp.InfoHeader.Size < 40 {
 		return nil, ErrInvalidHeaderSize
 	}
-	dibheader.WidthInPixels = int32(binary.LittleEndian.Uint32(b[18:22]))
-	dibheader.HeightInPixels = int32(binary.LittleEndian.Uint32(b[22:26]))
+	bmp.InfoHeader.Width = int32(binary.LittleEndian.Uint32(b[18:22]))
+	bmp.InfoHeader.Height = int32(binary.LittleEndian.Uint32(b[22:26]))
+	bmp.InfoHeader.Planes = binary.LittleEndian.Uint16(b[26:28])
+	bmp.InfoHeader.BitsPerPixel = binary.LittleEndian.Uint16(b[28:30])
+	bmp.InfoHeader.Compression = binary.LittleEndian.Uint32(b[30:34])
+	bmp.InfoHeader.ImageSize = binary.LittleEndian.Uint32(b[34:38])
+	bmp.InfoHeader.XPixelsPerMeter = int32(binary.LittleEndian.Uint32(b[38:42]))
+	bmp.InfoHeader.YPixelsPerMeter = int32(binary.LittleEndian.Uint32(b[42:46]))
+	bmp.InfoHeader.ColorsUsed = binary.LittleEndian.Uint32(b[46:50])
+	bmp.InfoHeader.ColorsImportant = binary.LittleEndian.Uint32(b[50:54])
 
-	// Ensure that both width and height are positive. Height can be negative (stored upside-down).
-	if dibheader.WidthInPixels <= 0 || dibheader.HeightInPixels == 0 {
-		return nil, ErrNonPositiveDimensions
+	// Validate header information
+	if err := validateHeaders(bmp, len(b)); err != nil {
+		return nil, err
 	}
 
-	dibheader.PixelSizeInBits = binary.LittleEndian.Uint16(b[28:30])
-	if dibheader.PixelSizeInBits != 24 { // Only 24-bit BMPs are supported.
-		return nil, ErrUnsupportedFormat
+	// Set pixel data
+	bmp.Data = b[bmp.Header.DataOffset:]
+
+	return bmp, nil
+}
+
+// validateHeaders performs various checks on the BMP and DIB headers to ensure
+// the BMP file is valid and supported. It checks for correct file size, positive
+// dimensions, supported bit depth, and uncompressed format. It also validates
+// the image size against the calculated expected size.
+//
+// Parameters:
+// - bmp: A pointer to the BMPImage struct containing the headers to validate.
+// - fileSize: The actual size of the BMP file in bytes.
+//
+// Returns:
+// - error: An error if any validation check fails, or nil if all checks pass.
+func validateHeaders(bmp *BMPImage, fileSize int) error {
+	if bmp.Header.FileSize != uint32(fileSize) {
+		return ErrCorruptFile
+	}
+	if bmp.InfoHeader.Width <= 0 || bmp.InfoHeader.Height == 0 {
+		return ErrNonPositiveDimensions
+	}
+	if bmp.InfoHeader.Planes != 1 {
+		return ErrUnsupportedFormat
+	}
+	if bmp.InfoHeader.BitsPerPixel != 24 {
+		return ErrUnsupportedFormat
+	}
+	if bmp.InfoHeader.Compression != 0 {
+		return ErrUnsupportedCompression
 	}
 
-	dibheader.ImageSizeInBytes = binary.LittleEndian.Uint32(b[34:38])
+	// Validate image size
+	widthInBytes := uint32(math.Abs(float64(bmp.InfoHeader.Width)) * float64(bmp.InfoHeader.BitsPerPixel) / 8)
+	paddedWidth := (widthInBytes + 3) & ^uint32(3) // Round up to nearest multiple of 4
+	expectedImageSize := (paddedWidth*uint32(math.Abs(float64(bmp.InfoHeader.Height))) + 3) & ^uint32(3)
 
-	// Calculate expected image size
-	expectedImageSize := int(dibheader.WidthInPixels)*int(abs32(dibheader.HeightInPixels))*int(dibheader.PixelSizeInBits)/8 + 2
-
-	// Debug log to check calculated sizes
-	// fmt.Printf("Width: %d, Height: %d, Expected Image Size: %d, Actual Image Size: %d\n",
-	// 	dibheader.WidthInPixels, dibheader.HeightInPixels, expectedImageSize, dibheader.ImageSizeInBytes)
-
-	// Ensure the actual image size matches the expected size
-	if expectedImageSize != int(dibheader.ImageSizeInBytes) {
-		return nil, ErrInvalidImageData
+	if bmp.InfoHeader.ImageSize != expectedImageSize {
+		return ErrInvalidImageData
 	}
 
-	// Return the parsed BMPImage struct containing headers and image data.
-	return &BMPImage{
-		bmpHeader: header,
-		dibHeader: dibheader,
-		Data:      b[54:], // Image data starts after the 54-byte header.
-	}, nil
+	return nil
 }
 
 // PrintBMPHeaderInfo prints the BMP and DIB header information in a formatted style.
-// It consolidates the BMP and DIB header details in one optimized print statement.
+// It displays all relevant fields from both headers, providing a comprehensive
+// overview of the BMP file structure and image properties.
+//
+// Parameters:
+// - image: A pointer to the BMPImage struct containing the headers to print.
 func PrintBMPHeaderInfo(image *BMPImage) {
-	// Print all header information in one go using `fmt.Printf` for efficiency.
 	fmt.Printf(`BMP Header:
-- FileType %s
-- FileSizeInBytes %d
-- HeaderSize %d
+- Signature: %s
+- FileSize: %d bytes
+- DataOffset: %d bytes
 DIB Header:
-- DibHeaderSize %d
-- WidthInPixels %d
-- HeightInPixels %d
-- PixelSizeInBits %d
-- ImageSizeInBytes %d
+- Size: %d bytes
+- Width: %d pixels
+- Height: %d pixels
+- Planes: %d
+- BitsPerPixel: %d
+- Compression: %d
+- ImageSize: %d bytes
+- XPixelsPerMeter: %d
+- YPixelsPerMeter: %d
+- ColorsUsed: %d
+- ColorsImportant: %d
 `,
-		image.bmpHeader.FileType,
-		image.bmpHeader.FileSizeInBytes,
-		image.bmpHeader.HeaderSize,
-		image.dibHeader.DibHeaderSize,
-		image.dibHeader.WidthInPixels,
-		image.dibHeader.HeightInPixels,
-		image.dibHeader.PixelSizeInBits,
-		image.dibHeader.ImageSizeInBytes,
+		image.Header.Signature,
+		image.Header.FileSize,
+		image.Header.DataOffset,
+		image.InfoHeader.Size,
+		image.InfoHeader.Width,
+		image.InfoHeader.Height,
+		image.InfoHeader.Planes,
+		image.InfoHeader.BitsPerPixel,
+		image.InfoHeader.Compression,
+		image.InfoHeader.ImageSize,
+		image.InfoHeader.XPixelsPerMeter,
+		image.InfoHeader.YPixelsPerMeter,
+		image.InfoHeader.ColorsUsed,
+		image.InfoHeader.ColorsImportant,
 	)
-}
-
-// abs32 returns the absolute value of a signed 32-bit integer.
-// It is used to handle potential negative image height, which indicates upside-down storage.
-func abs32(n int32) int32 {
-	if n < 0 {
-		return -n
-	}
-	return n
 }
