@@ -62,11 +62,13 @@ func Run() {
 		}
 
 		mirrorOpts := []string{}
-
+		filterOpts := []string{}
 		for _, arg := range args {
 			if strings.HasPrefix(arg, "--mirror=") {
 				opts := strings.Split(strings.TrimPrefix(arg, "--mirror="), ",")
 				mirrorOpts = append(mirrorOpts, opts...)
+			} else if strings.HasPrefix(arg, "--filter") {
+				filterOpts = append(filterOpts, strings.TrimPrefix(arg, "--filter="))
 			}
 		}
 
@@ -98,6 +100,16 @@ func Run() {
 				image = transformations.MirrorImage(image, "vertical")
 			default:
 				fmt.Printf("Invalid mirror option: %s\n", opt)
+				os.Exit(1)
+			}
+		}
+
+		for _, opt := range filterOpts {
+			switch opt {
+			case "blue", "red", "green", "grayscale", "negative", "pixelate":
+				transformations.Filter(image, opt)
+			default:
+				fmt.Printf("Invalid filter option: %s\n", opt)
 				os.Exit(1)
 			}
 		}
