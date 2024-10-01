@@ -63,12 +63,16 @@ func Run() {
 
 		mirrorOpts := []string{}
 		filterOpts := []string{}
+		rotateOpts := []string{}
 		for _, arg := range args {
 			if strings.HasPrefix(arg, "--mirror=") {
 				opts := strings.Split(strings.TrimPrefix(arg, "--mirror="), ",")
 				mirrorOpts = append(mirrorOpts, opts...)
-			} else if strings.HasPrefix(arg, "--filter") {
+			} else if strings.HasPrefix(arg, "--filter=") {
 				filterOpts = append(filterOpts, strings.TrimPrefix(arg, "--filter="))
+			} else if strings.HasPrefix(arg, "--rotate=") {
+				opts := strings.Split(strings.TrimPrefix(arg, "--rotate="), ",")
+				rotateOpts = append(rotateOpts, opts...)
 			}
 		}
 
@@ -110,6 +114,21 @@ func Run() {
 				transformations.Filter(image, opt)
 			default:
 				fmt.Printf("Invalid filter option: %s\n", opt)
+				os.Exit(1)
+			}
+		}
+
+		for _, opt := range rotateOpts {
+			switch opt {
+			case "right", "90", "-270":
+				transformations.Rotate(image, 1)
+			case "left", "-90", "270":
+				transformations.Rotate(image, -1)
+			case "-180", "180":
+				transformations.MirrorImage(image, "horizontal")
+				transformations.MirrorImage(image, "vertical")
+			default:
+				fmt.Printf("Invalid rotate option: %s\n", opt)
 				os.Exit(1)
 			}
 		}
