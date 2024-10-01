@@ -106,7 +106,7 @@ func Run() {
 
 		for _, opt := range filterOpts {
 			switch opt {
-			case "blue", "red", "green", "grayscale", "negative", "pixelate":
+			case "blue", "red", "green", "grayscale", "negative", "pixelate", "blur":
 				transformations.Filter(image, opt)
 			default:
 				fmt.Printf("Invalid filter option: %s\n", opt)
