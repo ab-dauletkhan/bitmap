@@ -17,6 +17,10 @@ const (
 	blur
 )
 
+// Filter applies a specified filter to the given BMPImage.
+// Supported filters: "blue", "green", "red", "grayscale", "negative", "pixelate", and "blur".
+// The "pixelate" filter uses a default block size of 20 pixels.
+// The "blur" filter applies a blur with a default radius of 50 pixels.
 func Filter(image *BMPImage, filter string) {
 	switch filter {
 	case "blue":
@@ -36,6 +40,8 @@ func Filter(image *BMPImage, filter string) {
 	}
 }
 
+// applyColor applies a color-based filter to the BMPImage data.
+// The color argument determines which channel to keep: blue, green, red, grayscale, or negative.
 func applyColor(image *BMPImage, color int) {
 	h := len(image.Data)
 	w := len(image.Data[0])
@@ -53,11 +59,13 @@ func applyColor(image *BMPImage, color int) {
 				image.Data[y][x].Blue = 0
 				image.Data[y][x].Green = 0
 			case grayscale:
+				// Convert pixel to grayscale using standard luminance calculation
 				gray := byte(float64(image.Data[y][x].Red)*0.2126 + float64(image.Data[y][x].Green)*0.7152 + float64(image.Data[y][x].Blue)*0.0722)
 				image.Data[y][x].Blue = gray
 				image.Data[y][x].Green = gray
 				image.Data[y][x].Red = gray
 			case negative:
+				// Invert the color values for a negative effect
 				image.Data[y][x].Blue = 255 - image.Data[y][x].Blue
 				image.Data[y][x].Green = 255 - image.Data[y][x].Green
 				image.Data[y][x].Red = 255 - image.Data[y][x].Red
@@ -66,6 +74,8 @@ func applyColor(image *BMPImage, color int) {
 	}
 }
 
+// applyPixelate applies a pixelation effect to the BMPImage data.
+// The blocksize argument specifies the size of the pixelation blocks.
 func applyPixelate(image *BMPImage, blocksize int) {
 	h := len(image.Data)
 	w := len(image.Data[0])
@@ -78,6 +88,8 @@ func applyPixelate(image *BMPImage, blocksize int) {
 	}
 }
 
+// avgColorBlock calculates the average color of a block starting at (startX, startY).
+// The blocksize determines the dimensions of the block to average.
 func avgColorBlock(image *BMPImage, startX, startY, blocksize int) Pixel {
 	var rSum, gSum, bSum, cnt uint32
 	h := len(image.Data)
@@ -92,6 +104,7 @@ func avgColorBlock(image *BMPImage, startX, startY, blocksize int) Pixel {
 		}
 	}
 
+	// Return the average color for the block
 	return Pixel{
 		Red:   byte(rSum / cnt),
 		Green: byte(gSum / cnt),
@@ -99,6 +112,8 @@ func avgColorBlock(image *BMPImage, startX, startY, blocksize int) Pixel {
 	}
 }
 
+// fillBlock fills a block of the image with a given color.
+// The block starts at (startX, startY) and has the size of blocksize.
 func fillBlock(image *BMPImage, startX, startY, blocksize int, colorPixel Pixel) {
 	h := len(image.Data)
 	w := len(image.Data[0])
@@ -110,6 +125,8 @@ func fillBlock(image *BMPImage, startX, startY, blocksize int, colorPixel Pixel)
 	}
 }
 
+// applyBlur applies a blur effect to the BMPImage using a blur radius.
+// The function divides the work between multiple goroutines based on the number of CPU cores available.
 func applyBlur(image *BMPImage, blurRadius int) {
 	startTime := time.Now()
 
@@ -128,7 +145,7 @@ func applyBlur(image *BMPImage, blurRadius int) {
 
 	var wg sync.WaitGroup
 
-	// Horizontal pass
+	// Horizontal pass of the blur
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(startY, endY int) {
@@ -159,7 +176,7 @@ func applyBlur(image *BMPImage, blurRadius int) {
 	}
 	wg.Wait()
 
-	// Vertical pass
+	// Vertical pass of the blur
 	for i := 0; i < numGoroutines; i++ {
 		wg.Add(1)
 		go func(startX, endX int) {
@@ -190,10 +207,12 @@ func applyBlur(image *BMPImage, blurRadius int) {
 	}
 	wg.Wait()
 
+	// Output the time taken to apply the blur
 	elapsedTime := time.Since(startTime)
 	fmt.Printf("Parallel blur operation took %v\n", elapsedTime)
 }
 
+// clamp ensures that the value is within the range 0 to 255.
 func clamp(v float64) float64 {
 	if v > 255 {
 		return 255
@@ -204,6 +223,7 @@ func clamp(v float64) float64 {
 	return v
 }
 
+// min returns the smaller of two integers.
 func min(a, b int) int {
 	if a < b {
 		return a

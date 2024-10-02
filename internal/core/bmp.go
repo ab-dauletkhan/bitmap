@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"os"
+
+	"github.com/ab-dauletkhan/bitmap/internal/utils"
 )
 
 // BMPHeader defines the structure for the BMP file header.
@@ -97,7 +99,7 @@ func ParseBMP(b []byte) (*BMPImage, error) {
 	}
 
 	// Set pixel data
-	h := int(bmp.InfoHeader.Height)
+	h := utils.Abs(int(bmp.InfoHeader.Height))
 	w := int(bmp.InfoHeader.Width)
 	bytesPerPixel := int(bmp.InfoHeader.BitsPerPixel) / 8
 	rowSize := w * bytesPerPixel
@@ -159,15 +161,17 @@ func validateHeaders(bmp *BMPImage, fileSize int) error {
 	return nil
 }
 
-// SerializeBMP converts a BMPImage struct into a byte slice representing the complete BMP file.
-// It handles the BMP and DIB headers, accounts for row padding, and properly organizes the pixel data.
+// SerializeBMP converts a BMPImage struct
+// into a byte slice representing the complete BMP file.
+// It handles the BMP and DIB headers, accounts for row padding,
+// and properly organizes the pixel data.
 func SerializeBMP(image *BMPImage) []byte {
 	// Calculate sizes and offsets
 	headerSize := int(image.Header.DataOffset)
 	width := int(image.InfoHeader.Width)
-	height := int(math.Abs(float64(image.InfoHeader.Height))) // Handle top-down BMPs
+	height := utils.Abs(int(image.InfoHeader.Height)) // Handle top-down BMPs
 	bytesPerPixel := int(image.InfoHeader.BitsPerPixel) / 8
-	rowSize := ((width*bytesPerPixel + 3) / 4) * 4 // Ensure 4-byte alignment
+	rowSize := (width*bytesPerPixel + 3) & ^3 // 4-byte alignment
 	dataSize := rowSize * height
 	totalSize := headerSize + dataSize
 

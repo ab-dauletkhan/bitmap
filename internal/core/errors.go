@@ -1,11 +1,16 @@
 package core
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+	"os"
+)
 
 var (
 	// Argument-related errors
 	ErrIncorrectArgument = errors.New("incorrect arguments provided; please check your input")
 	ErrMissingFilename   = errors.New("missing BMP filename; please specify a valid file for the header command")
+	ErrUnknownCmd        = errors.New("unknown command")
 
 	// Error variables for various BMP parsing and validation errors.
 	ErrInvalidBMP             = errors.New("invalid BMP file")
@@ -17,3 +22,13 @@ var (
 	ErrInvalidImageData       = errors.New("invalid image data")
 	ErrUnsupportedCompression = errors.New("unsupported compression method")
 )
+
+const (
+	colorRed   = "\033[1;31m"
+	colorReset = "\033[0m"
+)
+
+func PrintError(err error) {
+	fmt.Fprintf(os.Stderr, "%sError: %s %s\n", colorRed, err, colorReset)
+	os.Exit(1)
+}
