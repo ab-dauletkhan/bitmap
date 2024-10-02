@@ -1,8 +1,6 @@
-package transformations
+package core
 
-import "github.com/ab-dauletkhan/bitmap/internal/core"
-
-func MirrorImage(image *core.BMPImage, direction string) *core.BMPImage {
+func MirrorImage(image *BMPImage, direction string) *BMPImage {
 	h := len(image.Data)
 	w := len(image.Data[0])
 

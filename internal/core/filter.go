@@ -1,12 +1,10 @@
-package transformations
+package core
 
 import (
 	"fmt"
 	"runtime"
 	"sync"
 	"time"
-
-	"github.com/ab-dauletkhan/bitmap/internal/core"
 )
 
 const (
@@ -19,7 +17,7 @@ const (
 	blur
 )
 
-func Filter(image *core.BMPImage, filter string) {
+func Filter(image *BMPImage, filter string) {
 	switch filter {
 	case "blue":
 		applyColor(image, blue)
@@ -38,7 +36,7 @@ func Filter(image *core.BMPImage, filter string) {
 	}
 }
 
-func applyColor(image *core.BMPImage, color int) {
+func applyColor(image *BMPImage, color int) {
 	h := len(image.Data)
 	w := len(image.Data[0])
 
@@ -68,7 +66,7 @@ func applyColor(image *core.BMPImage, color int) {
 	}
 }
 
-func applyPixelate(image *core.BMPImage, blocksize int) {
+func applyPixelate(image *BMPImage, blocksize int) {
 	h := len(image.Data)
 	w := len(image.Data[0])
 
@@ -80,7 +78,7 @@ func applyPixelate(image *core.BMPImage, blocksize int) {
 	}
 }
 
-func avgColorBlock(image *core.BMPImage, startX, startY, blocksize int) core.Pixel {
+func avgColorBlock(image *BMPImage, startX, startY, blocksize int) Pixel {
 	var rSum, gSum, bSum, cnt uint32
 	h := len(image.Data)
 	w := len(image.Data[0])
@@ -94,14 +92,14 @@ func avgColorBlock(image *core.BMPImage, startX, startY, blocksize int) core.Pix
 		}
 	}
 
-	return core.Pixel{
+	return Pixel{
 		Red:   byte(rSum / cnt),
 		Green: byte(gSum / cnt),
 		Blue:  byte(bSum / cnt),
 	}
 }
 
-func fillBlock(image *core.BMPImage, startX, startY, blocksize int, colorPixel core.Pixel) {
+func fillBlock(image *BMPImage, startX, startY, blocksize int, colorPixel Pixel) {
 	h := len(image.Data)
 	w := len(image.Data[0])
 
@@ -112,7 +110,7 @@ func fillBlock(image *core.BMPImage, startX, startY, blocksize int, colorPixel c
 	}
 }
 
-func applyBlur(image *core.BMPImage, blurRadius int) {
+func applyBlur(image *BMPImage, blurRadius int) {
 	startTime := time.Now()
 
 	h := len(image.Data)

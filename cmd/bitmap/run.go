@@ -6,14 +6,13 @@ import (
 	"strings"
 
 	"github.com/ab-dauletkhan/bitmap/internal/core"
-	"github.com/ab-dauletkhan/bitmap/package/transformations"
 )
 
 func Run() {
 	// Manually parses the program arguments
 	//
 	// If no argument is given, print usage (help)
-	// Otherwise, checks the first argument and handles them separately
+	// Otherwise, checks the first argument and handle them separately
 	args := os.Args[1:]
 	if len(args) < 1 {
 		core.PrintUsage()
@@ -22,10 +21,10 @@ func Run() {
 	command := args[0]
 	args = args[1:]
 	switch command {
-	// The switch statement handles different commands based on the first argument.
 	// If the "header" command is provided, it requires a second argument,
-	// which should be the file path of the bitmap image.
-	// It attempts to read the file and parses its header.
+	// which should be the file path of the bitmap image or help flag.
+	// It attempts to identify it as a flag first, if not reads the file
+	// and parses its header.
 	// If any error occurs (e.g., incorrect arguments or file read error),
 	// the program exits with an appropriate error message.
 	// If flags --help or -h are provided, then prints help message
@@ -55,29 +54,11 @@ func Run() {
 		}
 		core.PrintBMPHeaderInfo(image)
 	case "apply":
-		if len(args) < 2 {
-			fmt.Println(core.ErrIncorrectArgument)
-			core.PrintUsage("apply")
+		transforms, inFile, outFile, err := core.ParseTransformations(args)
+		if err != nil {
+			fmt.Println(err)
 			os.Exit(1)
 		}
-
-		mirrorOpts := []string{}
-		filterOpts := []string{}
-		rotateOpts := []string{}
-		for _, arg := range args {
-			if strings.HasPrefix(arg, "--mirror=") {
-				opts := strings.Split(strings.TrimPrefix(arg, "--mirror="), ",")
-				mirrorOpts = append(mirrorOpts, opts...)
-			} else if strings.HasPrefix(arg, "--filter=") {
-				filterOpts = append(filterOpts, strings.TrimPrefix(arg, "--filter="))
-			} else if strings.HasPrefix(arg, "--rotate=") {
-				opts := strings.Split(strings.TrimPrefix(arg, "--rotate="), ",")
-				rotateOpts = append(rotateOpts, opts...)
-			}
-		}
-
-		inFile := args[len(args)-2]
-		outFile := args[len(args)-1]
 
 		if !strings.HasSuffix(inFile, ".bmp") || !strings.HasSuffix(outFile, ".bmp") {
 			fmt.Println(core.ErrInvalidFileType)
@@ -96,45 +77,13 @@ func Run() {
 			os.Exit(1)
 		}
 
-		for _, opt := range mirrorOpts {
-			switch opt {
-			case "horizontal", "h", "horizontally", "hor":
-				image = transformations.MirrorImage(image, "horizontal")
-			case "vertical", "v", "vertically", "ver":
-				image = transformations.MirrorImage(image, "vertical")
-			default:
-				fmt.Printf("Invalid mirror option: %s\n", opt)
-				os.Exit(1)
-			}
+		// Apply all transformations in sequence
+		if err := core.ApplyTransformations(image, transforms); err != nil {
+			fmt.Println(err)
+			os.Exit(1)
 		}
 
-		for _, opt := range filterOpts {
-			switch opt {
-			case "blue", "red", "green", "grayscale", "negative", "pixelate", "blur":
-				transformations.Filter(image, opt)
-			default:
-				fmt.Printf("Invalid filter option: %s\n", opt)
-				os.Exit(1)
-			}
-		}
-
-		for _, opt := range rotateOpts {
-			switch opt {
-			case "right", "90", "-270":
-				transformations.Rotate(image, 1)
-			case "left", "-90", "270":
-				transformations.Rotate(image, -1)
-			case "-180", "180":
-				transformations.MirrorImage(image, "horizontal")
-				transformations.MirrorImage(image, "vertical")
-			default:
-				fmt.Printf("Invalid rotate option: %s\n", opt)
-				os.Exit(1)
-			}
-		}
-
-		err = core.SaveBMP(image, outFile)
-		if err != nil {
+		if err := core.SaveBMP(image, outFile); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
