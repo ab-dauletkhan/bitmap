@@ -30,5 +30,15 @@ const (
 
 func PrintError(err error) {
 	fmt.Fprintf(os.Stderr, "%sError: %s %s\n", colorRed, err, colorReset)
+}
+
+func PrintErrorExit(err error) {
+	PrintError(err)
+	os.Exit(1)
+}
+
+func PrintErrorUsageExit(err error, usage string) {
+	PrintError(err)
+	PrintUsage("header")
 	os.Exit(1)
 }

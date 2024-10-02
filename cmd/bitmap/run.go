@@ -31,25 +31,26 @@ func Run() {
 	// If flags --help or -h are provided, then prints help message
 	case "header":
 		if len(args) != 1 {
-			core.PrintError(core.ErrIncorrectArgument)
+			core.PrintErrorUsageExit(core.ErrIncorrectArgument, "header")
 		}
 
-		if strings.HasPrefix(args[0], "-") {
-			if args[0] != "--help" && args[0] != "-h" {
-				core.PrintError(core.ErrIncorrectArgument)
+		if !strings.HasSuffix(args[0], ".bmp") {
+			if args[0] == "--help" || args[0] == "-h" {
+				core.PrintUsage("header")
+				return
+			} else {
+				core.PrintErrorUsageExit(core.ErrIncorrectArgument, "header")
 			}
-			core.PrintUsage("header")
-			return
 		}
 
 		bytes, err := os.ReadFile(args[0])
 		if err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
 
 		image, err := core.ParseBMP(bytes)
 		if err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
 		core.PrintBMPHeaderInfo(image)
 

@@ -35,7 +35,7 @@ Description:
   Prints bitmap file header information
 
 Arguments:
-  <source_file>    Path to the source bitmap file
+  <source_file>    Path to the source bitmap (.bmp) file
 `
 	ApplyHelp = `Usage:
   bitmap apply [options] <source_file> <output_file>

@@ -60,7 +60,6 @@ func parseCropInfo(cropStr string) (CropInfo, error) {
 // with the specified Width and Height. An error is returned if the crop
 // area exceeds the image boundaries or if it results in invalid dimensions.
 func Crop(image *BMPImage, opts CropInfo) error {
-
 	if opts.OffsetX+opts.Width > len(image.Data[0]) || opts.OffsetY+opts.Height > len(image.Data) {
 		return fmt.Errorf("crop area exceeds image boundaries")
 	}
