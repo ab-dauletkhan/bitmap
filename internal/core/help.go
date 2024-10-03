@@ -48,10 +48,11 @@ Arguments:
   <output_file>    Path to save the processed bitmap file
 
 Options:
-  --mirror=<value>       Mirror the image. Values: horizontal, h, horizontally, hor, vertical, v, vertically, ver
-  --filter=<value>       Apply a filter. Can be used multiple times. Values: blue, red, green, grayscale, negative, pixelate, blur
-  --rotate=<value>       Rotate the image. Can be used multiple times. Values: right, 90, 180, 270, left, -90, -180, -270
-  --crop=<value>         Crop the image. Format: OffsetX-OffsetY-Width-Height. Width and Height are optional
+  --mirror=<value>        Mirror the image. Values: horizontal, h, horizontally, hor, vertical, v, vertically, ver
+  --filter=<value>        Apply a filter. Can be used multiple times. Values: blue, red, green, grayscale, negative, pixelate, blur
+                          Default values: pixelate = 20px, blur = 20px
+  --rotate=<value>        Rotate the image. Can be used multiple times. Values: right, 90, 180, 270, left, -90, -180, -270
+  --crop=<value>          Crop the image. Format: OffsetX-OffsetY-Width-Height. Width and Height are optional
 
 Examples:
   bitmap apply --mirror=horizontal --filter=grayscale input.bmp output.bmp

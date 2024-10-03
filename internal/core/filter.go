@@ -1,12 +1,5 @@
 package core
 
-import (
-	"fmt"
-	"runtime"
-	"sync"
-	"time"
-)
-
 const (
 	blue = iota
 	green
@@ -34,9 +27,9 @@ func Filter(image *BMPImage, filter string) {
 	case "negative":
 		applyColor(image, negative)
 	case "pixelate":
-		applyPixelate(image, 20)
+		applyPixelate(image, 50)
 	case "blur":
-		applyBlur(image, 50)
+		applyBlur(image, 20)
 	}
 }
 
@@ -125,108 +118,159 @@ func fillBlock(image *BMPImage, startX, startY, blocksize int, colorPixel Pixel)
 	}
 }
 
-// applyBlur applies a blur effect to the BMPImage using a blur radius.
-// The function divides the work between multiple goroutines based on the number of CPU cores available.
+// applyBlur applies a basic box blur to the given BMPImage.
+// The blurRadius defines the size of the neighborhood around each pixel used for averaging.
+// A larger blurRadius results in a more pronounced blur effect.
 func applyBlur(image *BMPImage, blurRadius int) {
-	startTime := time.Now()
+	width := int(image.InfoHeader.Width)
+	height := int(image.InfoHeader.Height)
 
-	h := len(image.Data)
-	w := len(image.Data[0])
-	k := 2*blurRadius + 1
-	weight := 1.0 / float64(k)
-
-	// Determine the number of goroutines to use
-	numGoroutines := runtime.NumCPU()
-	chunkSize := h / numGoroutines
-	if chunkSize < 1 {
-		chunkSize = 1
-		numGoroutines = h
+	// Create a copy of the original image data to store blurred results.
+	blurredData := make([][]Pixel, height)
+	for i := range blurredData {
+		blurredData[i] = make([]Pixel, width)
 	}
 
-	var wg sync.WaitGroup
+	// Iterate over each pixel in the image.
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			// Initialize accumulators for each color channel.
+			var redSum, greenSum, blueSum, count int
 
-	// Horizontal pass of the blur
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(startY, endY int) {
-			defer wg.Done()
-			for y := startY; y < endY; y++ {
-				tempRow := make([]float64, w*3)
-				for x := 0; x < w; x++ {
-					var rSum, gSum, bSum float64
-					for i := -blurRadius; i <= blurRadius; i++ {
-						ix := x + i
-						if ix >= 0 && ix < w {
-							rSum += float64(image.Data[y][ix].Red)
-							gSum += float64(image.Data[y][ix].Green)
-							bSum += float64(image.Data[y][ix].Blue)
-						}
+			// Iterate over the neighborhood of the current pixel.
+			for ky := -blurRadius; ky <= blurRadius; ky++ {
+				for kx := -blurRadius; kx <= blurRadius; kx++ {
+					// Calculate the neighboring pixel's coordinates.
+					nx := x + kx
+					ny := y + ky
+
+					// Ensure the neighboring pixel is within bounds.
+					if nx >= 0 && nx < width && ny >= 0 && ny < height {
+						// Accumulate the color values.
+						pixel := image.Data[ny][nx]
+						redSum += int(pixel.Red)
+						greenSum += int(pixel.Green)
+						blueSum += int(pixel.Blue)
+						count++
 					}
-					tempRow[x*3] = rSum * weight
-					tempRow[x*3+1] = gSum * weight
-					tempRow[x*3+2] = bSum * weight
-				}
-				for x := 0; x < w; x++ {
-					image.Data[y][x].Red = byte(clamp(tempRow[x*3]))
-					image.Data[y][x].Green = byte(clamp(tempRow[x*3+1]))
-					image.Data[y][x].Blue = byte(clamp(tempRow[x*3+2]))
 				}
 			}
-		}(i*chunkSize, min((i+1)*chunkSize, h))
-	}
-	wg.Wait()
 
-	// Vertical pass of the blur
-	for i := 0; i < numGoroutines; i++ {
-		wg.Add(1)
-		go func(startX, endX int) {
-			defer wg.Done()
-			for x := startX; x < endX; x++ {
-				tempCol := make([]float64, h*3)
-				for y := 0; y < h; y++ {
-					var rSum, gSum, bSum float64
-					for i := -blurRadius; i <= blurRadius; i++ {
-						iy := y + i
-						if iy >= 0 && iy < h {
-							rSum += float64(image.Data[iy][x].Red)
-							gSum += float64(image.Data[iy][x].Green)
-							bSum += float64(image.Data[iy][x].Blue)
-						}
-					}
-					tempCol[y*3] = rSum * weight
-					tempCol[y*3+1] = gSum * weight
-					tempCol[y*3+2] = bSum * weight
-				}
-				for y := 0; y < h; y++ {
-					image.Data[y][x].Red = byte(clamp(tempCol[y*3]))
-					image.Data[y][x].Green = byte(clamp(tempCol[y*3+1]))
-					image.Data[y][x].Blue = byte(clamp(tempCol[y*3+2]))
-				}
+			// Calculate the average color values for the pixel.
+			blurredData[y][x] = Pixel{
+				Red:   byte(redSum / count),
+				Green: byte(greenSum / count),
+				Blue:  byte(blueSum / count),
 			}
-		}(i*chunkSize, min((i+1)*chunkSize, w))
+		}
 	}
-	wg.Wait()
 
-	// Output the time taken to apply the blur
-	elapsedTime := time.Since(startTime)
-	fmt.Printf("Parallel blur operation took %v\n", elapsedTime)
+	// Replace the original image data with the blurred version.
+	image.Data = blurredData
 }
 
-// clamp ensures that the value is within the range 0 to 255.
-func clamp(v float64) float64 {
-	if v > 255 {
-		return 255
-	}
-	if v < 0 {
-		return 0
-	}
-	return v
-}
+// // applyBlur applies a blur effect to the BMPImage using a blur radius.
+// // The function divides the work between multiple goroutines based on the number of CPU cores available.
+// func applyBlur(image *BMPImage, blurRadius int) {
+// 	startTime := time.Now()
 
-// min returns the smaller of two integers.
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
+// 	h := len(image.Data)
+// 	w := len(image.Data[0])
+// 	k := 2*blurRadius + 1
+// 	weight := 1.0 / float64(k)
+
+// 	// Determine the number of goroutines to use
+// 	numGoroutines := runtime.NumCPU()
+// 	chunkSize := h / numGoroutines
+// 	if chunkSize < 1 {
+// 		chunkSize = 1
+// 		numGoroutines = h
+// 	}
+
+// 	var wg sync.WaitGroup
+
+// 	// Horizontal pass of the blur
+// 	for i := 0; i < numGoroutines; i++ {
+// 		wg.Add(1)
+// 		go func(startY, endY int) {
+// 			defer wg.Done()
+// 			for y := startY; y < endY; y++ {
+// 				tempRow := make([]float64, w*3)
+// 				for x := 0; x < w; x++ {
+// 					var rSum, gSum, bSum float64
+// 					for i := -blurRadius; i <= blurRadius; i++ {
+// 						ix := x + i
+// 						if ix >= 0 && ix < w {
+// 							rSum += float64(image.Data[y][ix].Red)
+// 							gSum += float64(image.Data[y][ix].Green)
+// 							bSum += float64(image.Data[y][ix].Blue)
+// 						}
+// 					}
+// 					tempRow[x*3] = rSum * weight
+// 					tempRow[x*3+1] = gSum * weight
+// 					tempRow[x*3+2] = bSum * weight
+// 				}
+// 				for x := 0; x < w; x++ {
+// 					image.Data[y][x].Red = byte(clamp(tempRow[x*3]))
+// 					image.Data[y][x].Green = byte(clamp(tempRow[x*3+1]))
+// 					image.Data[y][x].Blue = byte(clamp(tempRow[x*3+2]))
+// 				}
+// 			}
+// 		}(i*chunkSize, min((i+1)*chunkSize, h))
+// 	}
+// 	wg.Wait()
+
+// 	// Vertical pass of the blur
+// 	for i := 0; i < numGoroutines; i++ {
+// 		wg.Add(1)
+// 		go func(startX, endX int) {
+// 			defer wg.Done()
+// 			for x := startX; x < endX; x++ {
+// 				tempCol := make([]float64, h*3)
+// 				for y := 0; y < h; y++ {
+// 					var rSum, gSum, bSum float64
+// 					for i := -blurRadius; i <= blurRadius; i++ {
+// 						iy := y + i
+// 						if iy >= 0 && iy < h {
+// 							rSum += float64(image.Data[iy][x].Red)
+// 							gSum += float64(image.Data[iy][x].Green)
+// 							bSum += float64(image.Data[iy][x].Blue)
+// 						}
+// 					}
+// 					tempCol[y*3] = rSum * weight
+// 					tempCol[y*3+1] = gSum * weight
+// 					tempCol[y*3+2] = bSum * weight
+// 				}
+// 				for y := 0; y < h; y++ {
+// 					image.Data[y][x].Red = byte(clamp(tempCol[y*3]))
+// 					image.Data[y][x].Green = byte(clamp(tempCol[y*3+1]))
+// 					image.Data[y][x].Blue = byte(clamp(tempCol[y*3+2]))
+// 				}
+// 			}
+// 		}(i*chunkSize, min((i+1)*chunkSize, w))
+// 	}
+// 	wg.Wait()
+
+// 	// Output the time taken to apply the blur
+// 	elapsedTime := time.Since(startTime)
+// 	fmt.Printf("Parallel blur operation took %v\n", elapsedTime)
+// }
+
+// // clamp ensures that the value is within the range 0 to 255.
+// func clamp(v float64) float64 {
+// 	if v > 255 {
+// 		return 255
+// 	}
+// 	if v < 0 {
+// 		return 0
+// 	}
+// 	return v
+// }
+
+// // min returns the smaller of two integers.
+// func min(a, b int) int {
+// 	if a < b {
+// 		return a
+// 	}
+// 	return b
+// }

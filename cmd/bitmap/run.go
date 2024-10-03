@@ -2,7 +2,6 @@ package bitmap
 
 import (
 	"os"
-	"strings"
 
 	"github.com/ab-dauletkhan/bitmap/internal/core"
 )
@@ -34,13 +33,18 @@ func Run() {
 			core.PrintErrorUsageExit(core.ErrIncorrectArgument, "header")
 		}
 
-		if !strings.HasSuffix(args[0], ".bmp") {
-			if args[0] == "--help" || args[0] == "-h" {
-				core.PrintUsage("header")
-				return
-			} else {
-				core.PrintErrorUsageExit(core.ErrIncorrectArgument, "header")
-			}
+		// if !strings.HasSuffix(args[0], ".bmp") {
+		// 	if args[0] == "--help" || args[0] == "-h" {
+		// 		core.PrintUsage("header")
+		// 		return
+		// 	} else {
+		// 		core.PrintErrorUsageExit(core.ErrIncorrectArgument, "header")
+		// 	}
+		// }
+
+		if args[0] == "--help" || args[0] == "-h" {
+			core.PrintUsage("header")
+			return
 		}
 
 		bytes, err := os.ReadFile(args[0])
@@ -61,41 +65,41 @@ func Run() {
 	// If any error occurs during processing (invalid options, file operations, etc.),
 	// the program exits with an appropriate error message.
 	case "apply":
+		if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+			core.PrintUsage("apply")
+			return
+		}
 		transforms, inFile, outFile, err := core.ParseTransformations(args)
 		if err != nil {
-			core.PrintError(err)
+			core.PrintErrorUsageExit(err, "apply")
 		}
 
-		if !strings.HasSuffix(inFile, ".bmp") || !strings.HasSuffix(outFile, ".bmp") {
-			core.PrintError(core.ErrInvalidFileType)
-		}
+		// if !strings.HasSuffix(inFile, ".bmp") || !strings.HasSuffix(outFile, ".bmp") {
+		// 	core.PrintError(core.ErrInvalidFileType)
+		// }
 
 		bytes, err := os.ReadFile(inFile)
 		if err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
 
 		image, err := core.ParseBMP(bytes)
 		if err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
 
 		if err := core.ApplyTransformations(image, transforms); err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
 
 		if err := core.SaveBMP(image, outFile); err != nil {
-			core.PrintError(err)
+			core.PrintErrorExit(err)
 		}
-		return
 
-	// If --help or -h flags are provided, prints general usage information
 	case "--help", "-h":
 		core.PrintUsage()
-		return
 
-	// If an unknown command is provided, prints error and usage information
 	default:
-		core.PrintError(core.ErrUnknownCmd)
+		core.PrintErrorUsageExit(core.ErrUnknownCmd, "main")
 	}
 }

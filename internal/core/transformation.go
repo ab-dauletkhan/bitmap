@@ -123,6 +123,8 @@ func ParseTransformations(args []string) ([]Transform, string, string, error) {
 				Type:    CropTransform,
 				Options: cropInfo,
 			})
+		default:
+			return nil, "", "", fmt.Errorf("incorrect argument: %s", arg)
 		}
 	}
 

@@ -197,15 +197,25 @@ func SerializeBMP(image *BMPImage) []byte {
 	binary.LittleEndian.PutUint32(data[46:50], image.InfoHeader.ColorsUsed)
 	binary.LittleEndian.PutUint32(data[50:54], image.InfoHeader.ColorsImportant)
 
-	// Serialize pixel data
+	// Serialize pixel data with padding
 	offset := headerSize
+	rowBytes := width * bytesPerPixel // actual bytes used by pixels in a row
+	padding := rowSize - rowBytes     // padding bytes needed for 4-byte alignment
+
 	for y := 0; y < height; y++ {
+		// Write pixel data for the current row
 		for x := 0; x < width; x++ {
 			pixel := image.Data[y][x]
 			data[offset] = pixel.Blue
 			data[offset+1] = pixel.Green
 			data[offset+2] = pixel.Red
 			offset += bytesPerPixel
+		}
+
+		// Add padding bytes at the end of the row
+		for p := 0; p < padding; p++ {
+			data[offset] = 0
+			offset++
 		}
 	}
 

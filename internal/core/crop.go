@@ -30,12 +30,12 @@ func parseCropInfo(cropStr string) (CropInfo, error) {
 
 	var err error
 	cropInfo.OffsetX, err = strconv.Atoi(info[0])
-	if err != nil || cropInfo.OffsetX <= 0 {
+	if err != nil || cropInfo.OffsetX < 0 {
 		return cropInfo, fmt.Errorf("invalid OffsetX value")
 	}
 
 	cropInfo.OffsetY, err = strconv.Atoi(info[1])
-	if err != nil || cropInfo.OffsetY <= 0 {
+	if err != nil || cropInfo.OffsetY < 0 {
 		return cropInfo, fmt.Errorf("invalid OffsetY value")
 	}
 
@@ -60,32 +60,67 @@ func parseCropInfo(cropStr string) (CropInfo, error) {
 // with the specified Width and Height. An error is returned if the crop
 // area exceeds the image boundaries or if it results in invalid dimensions.
 func Crop(image *BMPImage, opts CropInfo) error {
-	if opts.OffsetX+opts.Width > len(image.Data[0]) || opts.OffsetY+opts.Height > len(image.Data) {
-		return fmt.Errorf("crop area exceeds image boundaries")
+	originalWidth := int(image.InfoHeader.Width)
+	originalHeight := int(image.InfoHeader.Height)
+	isTopDown := originalHeight < 0
+	absHeight := utils.Abs(originalHeight)
+
+	if opts.OffsetX >= originalWidth || opts.OffsetY >= absHeight {
+		return fmt.Errorf("offset values exceed image dimensions")
 	}
 
 	if opts.Width == 0 {
-		opts.Width = int(image.InfoHeader.Width) - opts.OffsetX
+		opts.Width = originalWidth - opts.OffsetX
+	}
+	if opts.Height == 0 {
+		opts.Height = absHeight - opts.OffsetY
 	}
 
-	if opts.Height == 0 {
-		opts.Height = utils.Abs(int(image.InfoHeader.Height)) - opts.OffsetY
+	if opts.OffsetX+opts.Width > originalWidth || opts.OffsetY+opts.Height > absHeight {
+		return fmt.Errorf("crop area exceeds image boundaries")
 	}
 
 	croppedData := make([][]Pixel, opts.Height)
 	for i := range croppedData {
 		croppedData[i] = make([]Pixel, opts.Width)
-	}
 
-	for y := 0; y < opts.Height; y++ {
-		for x := 0; x < opts.Width; x++ {
-			croppedData[y][x] = image.Data[opts.OffsetY+y][opts.OffsetX+x]
+		var srcRow int
+		// Comment for the reviewer, in my MacOS for some reason it is reversed
+		// https://en.wikipedia.org/wiki/BMP_file_format#Pixel_array_(bitmap_data)
+		// when topDown (height is negative) is should start from the top,
+		// however, in my macOS it did complementary, so I changed this to !isTopDown
+		// I might change it on Alem PC's.
+		// glhf
+		if !isTopDown {
+			// For top-down images, map rows starting from the top
+			srcRow = opts.OffsetY + i
+		} else {
+			// For bottom-up images, map rows starting from the bottom
+			srcRow = absHeight - 1 - (opts.OffsetY + i)
+		}
+
+		for j := 0; j < opts.Width; j++ {
+			croppedData[i][j] = image.Data[srcRow][opts.OffsetX+j]
 		}
 	}
 
 	image.Data = croppedData
+
+	bytesPerPixel := int(image.InfoHeader.BitsPerPixel) / 8
+	rowSize := (opts.Width*bytesPerPixel + 3) & ^3
+	imageSize := rowSize * opts.Height
+
+	// Update BMP header file size (headers + pixel data)
+	image.Header.FileSize = uint32(int(image.Header.DataOffset) + imageSize)
+
 	image.InfoHeader.Width = int32(opts.Width)
-	image.InfoHeader.Height = int32(opts.Height)
+	// Maintain the original orientation (negative height for top-down, positive for bottom-up)
+	if isTopDown {
+		image.InfoHeader.Height = int32(-opts.Height)
+	} else {
+		image.InfoHeader.Height = int32(opts.Height)
+	}
+	image.InfoHeader.ImageSize = uint32(imageSize)
 
 	return nil
 }
