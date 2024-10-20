@@ -101,9 +101,3 @@ This project is open source and available under the [MIT License](LICENSE).
 ## Contributing
 
 Contributions to the bitmap project are welcome! Please feel free to submit a Pull Request.
-
-Dias Kappassov, FrontEnd Developer at Doodocs.kz
-
-- Email: [kappassov@doodocs.kz](mailto:kappassov@doodocs.kz)
-- [GitHub](https://github.com/Dias1c/)
-- [LinkedIn](https://www.linkedin.com/in/diaskappassov/)
