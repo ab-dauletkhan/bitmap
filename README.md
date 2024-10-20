@@ -20,7 +20,7 @@
 ### Cloning the Repository
 
 ```bash
-git clone https://github.com/yourusername/bitmap.git
+git clone https://github.com/ab-dauletkhan/bitmap.git
 cd bitmap
 ```
 
